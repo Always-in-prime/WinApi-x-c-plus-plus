@@ -5,50 +5,32 @@
 #include <vector>
 #include "button.h"
 
-// Dock panel that manages all UI elements and handles user interaction
 class DockPanel {
- public:
-  DockPanel();
+public:
+    DockPanel();
+    void Initialize();
+    void SetHwnd(HWND hwnd);
+    void Render(HWND hwnd) const;
 
-  // Initialize buttons and system tray icon
-  void Initialize();
+    bool HandleMouseMove(HWND hwnd, int x, int y);
+    bool HandleMouseLeave(HWND hwnd);
+    bool HandleLeftButtonDown(HWND hwnd, int x, int y);
 
-  // Set window handle for system tray integration
-  void SetHwnd(HWND hwnd);
+    void HandleTrayMessage(HWND hwnd, LPARAM lParam);
+    void HandleCommand(WPARAM wParam, HWND hwnd);
+    void Cleanup();
 
-  // Render the dock panel to the window
-  void Render(HWND hwnd) const;
+    NOTIFYICONDATAW* GetNotifyIconData() { return &nid_; }
+    HRGN CreateCloudRegion() const;
 
-  // Handle mouse events
-  bool HandleMouseMove(HWND hwnd, int x, int y);
-  bool HandleMouseLeave(HWND hwnd);
-  bool HandleLeftButtonDown(HWND hwnd, int x, int y);
+private:
+    void DrawCloudShape(HDC hdc) const;
 
-  // Handle system tray messages
-  void HandleTrayMessage(HWND hwnd, LPARAM lParam);
-  void HandleCommand(WPARAM wParam, HWND hwnd);
-
-  // Cleanup resources
-  void Cleanup();
-
-  // Get notify icon data for shell integration
-  NOTIFYICONDATAW* GetNotifyIconData() { return &nid_; }
-
-  // Create cloud-shaped window region (public for main.cpp)
-  HRGN CreateCloudRegion() const;
-
- private:
-  // Drawing helpers
-  void DrawCloudShape(Graphics& graphics) const;
-  void DrawControlButtons(Graphics& graphics) const;
-  void DrawAppButtons(Graphics& graphics) const;
-  void DrawLinkButtons(Graphics& graphics) const;
-
-  std::vector<AppButton> app_buttons_;
-  std::vector<AppButton> link_buttons_;
-  std::vector<ControlButton> ctrl_buttons_;
-  bool is_mouse_inside_;
-  NOTIFYICONDATAW nid_{};
+    std::vector<AppButton> app_buttons_;
+    std::vector<AppButton> link_buttons_;
+    std::vector<ControlButton> ctrl_buttons_;
+    bool is_mouse_inside_;
+    NOTIFYICONDATAW nid_{};
 };
 
 #endif  // DOCK_PANEL_H_
