@@ -64,7 +64,7 @@ void DockPanel::Initialize() {
     wcscpy_s(nid_.szTip, L"Custom Dock Panel");
 }
 
-void DockPanel::SetHwnd(HWND hwnd) { 
+void DockPanel::SetHwnd(HWND hwnd) {
     nid_.hWnd = hwnd;
     // Регистрация иконки в трее (раньше она только настраивалась, но не добавлялась)
     Shell_NotifyIconW(NIM_ADD, &nid_);
@@ -82,7 +82,7 @@ void DockPanel::Render(HWND hwnd) const {
     HDC hdcMem = CreateCompatibleDC(hdcScreen);
 
     // Создаем 32-битный DIB-раздел для корректной работы с альфа-каналом
-    BITMAPINFO bi = {0};
+    BITMAPINFO bi = { 0 };
     bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     bi.bmiHeader.biWidth = width;
     bi.bmiHeader.biHeight = -height; // Отрицательная высота для сверху-вниз (top-down)
@@ -235,7 +235,7 @@ bool DockPanel::HandleLeftButtonDown(HWND hwnd, int x, int y) {
     if (!handled) {
         PostMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
     }
-    
+
     return handled;
 }
 
@@ -286,8 +286,8 @@ void DockPanel::DrawCloudShape(Graphics& graphics) const {
         PointF(550.0f, 170.0f), PointF(400.0f, 175.0f), PointF(250.0f, 170.0f),
         PointF(120.0f, 160.0f) };
 
-  GraphicsPath cloud_path;
-  cloud_path.AddClosedCurve(pts, _countof(pts));
+    GraphicsPath cloud_path;
+    cloud_path.AddClosedCurve(pts, _countof(pts));
 
     SolidBrush bg_brush(Color(255, 45, 45, 50));
     graphics.FillPath(&bg_brush, &cloud_path);
@@ -315,29 +315,33 @@ void DockPanel::DrawAppButtons(Graphics& graphics) const {
 }
 
 HRGN DockPanel::CreateCloudRegion() const {
-  // Create cloud-shaped region for window clipping
-  PointF pts[] = {
-      PointF(50.0f, 140.0f), PointF(20.0f, 100.0f), PointF(50.0f, 60.0f),
-      PointF(120.0f, 20.0f), PointF(250.0f, 10.0f), PointF(400.0f, 5.0f),
-      PointF(550.0f, 10.0f), PointF(680.0f, 20.0f), PointF(750.0f, 60.0f),
-      PointF(780.0f, 100.0f), PointF(750.0f, 140.0f), PointF(680.0f, 160.0f),
-      PointF(550.0f, 170.0f), PointF(400.0f, 175.0f), PointF(250.0f, 170.0f),
-      PointF(120.0f, 160.0f)};
+    PointF pts[] = {
+        PointF(50.0f, 140.0f), PointF(20.0f, 100.0f), PointF(50.0f, 60.0f),
+        PointF(120.0f, 20.0f), PointF(250.0f, 10.0f), PointF(400.0f, 5.0f),
+        PointF(550.0f, 10.0f), PointF(680.0f, 20.0f), PointF(750.0f, 60.0f),
+        PointF(780.0f, 100.0f), PointF(750.0f, 140.0f), PointF(680.0f, 160.0f),
+        PointF(550.0f, 170.0f), PointF(400.0f, 175.0f), PointF(250.0f, 170.0f),
+        PointF(120.0f, 160.0f) };
 
-  GraphicsPath cloud_path;
-  cloud_path.AddClosedCurve(pts, _countof(pts));
+    GraphicsPath cloud_path;
+    cloud_path.AddClosedCurve(pts, _countof(pts));
 
-  Region region(&cloud_path);
-  HRGN hRgn = nullptr;
-  
-  // GetDC for creating Graphics context needed by GetHRGN
-  HDC hdc = GetDC(nullptr);
-  Graphics graphics(hdc);
-  Status status = region.GetHRGN(&graphics, &hRgn);
-  ReleaseDC(nullptr, hdc);
-  
-  if (status != Ok) {
-    return nullptr;
-  }
-  return hRgn;
+    Region region(&cloud_path);
+
+    // Создаем временный Graphics контекст (требуется API GDI+)
+    HDC hdc = GetDC(nullptr);
+    Graphics graphics(hdc);
+
+    // Вызываем GetHRGN с одним аргументом - указателем на Graphics
+    // Метод сам вернет HRGN, статус проверяем отдельно
+    HRGN hRgn = region.GetHRGN(&graphics);
+
+    ReleaseDC(nullptr, hdc);
+
+    // Проверяем статус последней операции над регионом
+    if (region.GetLastStatus() != Ok || hRgn == nullptr) {
+        return nullptr;
+    }
+
+    return hRgn;
 }
