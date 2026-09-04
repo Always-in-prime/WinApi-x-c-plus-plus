@@ -119,10 +119,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   }
 
   // Apply cloud-shaped region to window
-  DockPanel* temp_panel = new DockPanel();
-  temp_panel->Initialize();
-  HRGN hCloudRgn = temp_panel->CreateCloudRegion();
-  delete temp_panel;
+  DockPanel temp_panel;
+  temp_panel.Initialize();
+  HRGN hCloudRgn = temp_panel.CreateCloudRegion();
   
   if (hCloudRgn) {
     SetWindowRgn(hwnd, hCloudRgn, TRUE);

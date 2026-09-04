@@ -301,6 +301,9 @@ HRGN DockPanel::CreateCloudRegion() const {
   cloud_path.AddClosedCurve(pts, 12);
 
   HRGN hRgn = nullptr;
-  cloud_path.GetHRGN(&hRgn);
+  Status status = cloud_path.GetHRGN(&hRgn);
+  if (status != Ok) {
+    return nullptr;
+  }
   return hRgn;
 }
