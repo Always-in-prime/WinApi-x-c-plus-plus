@@ -112,20 +112,31 @@ class TestDockPanelLogic(unittest.TestCase):
 
     def setUp(self):
         """Set up a simulated dock panel with buttons."""
-        # Simulate typical dock layout
-        self.dock_bounds = RectF(0.0, 0.0, 600.0, 100.0)
+        # Simulate typical dock layout (800x180)
+        self.dock_bounds = RectF(0.0, 0.0, 800.0, 180.0)
 
         # Control buttons (top-right)
         self.ctrl_buttons = [
-            Button(RectF(500.0, 10.0, 30.0, 30.0), button_type="minimize"),
-            Button(RectF(540.0, 10.0, 30.0, 30.0), button_type="close"),
+            Button(RectF(710.0, 25.0, 30.0, 30.0), button_type="minimize"),
+            Button(RectF(750.0, 25.0, 30.0, 30.0), button_type="close"),
         ]
 
-        # App buttons (bottom row)
+        # Link buttons (top row - web links)
+        self.link_buttons = [
+            Button(RectF(60.0, 30.0, 60.0, 60.0), button_type="link", name="GitHub"),
+            Button(RectF(140.0, 30.0, 60.0, 60.0), button_type="link", name="YouTube"),
+            Button(RectF(220.0, 30.0, 60.0, 60.0), button_type="link", name="Google"),
+            Button(RectF(300.0, 30.0, 60.0, 60.0), button_type="link", name="StackOverflow"),
+            Button(RectF(380.0, 30.0, 60.0, 60.0), button_type="link", name="Reddit"),
+        ]
+
+        # App buttons (bottom row - programs)
         self.app_buttons = [
-            Button(RectF(20.0, 50.0, 40.0, 40.0), button_type="app", name="Chrome"),
-            Button(RectF(70.0, 50.0, 40.0, 40.0), button_type="app", name="VSCode"),
-            Button(RectF(120.0, 50.0, 40.0, 40.0), button_type="app", name="Terminal"),
+            Button(RectF(60.0, 130.0, 60.0, 60.0), button_type="app", name="Chrome"),
+            Button(RectF(140.0, 130.0, 60.0, 60.0), button_type="app", name="Explorer"),
+            Button(RectF(220.0, 130.0, 60.0, 60.0), button_type="app", name="Notepad"),
+            Button(RectF(300.0, 130.0, 60.0, 60.0), button_type="app", name="Calculator"),
+            Button(RectF(380.0, 130.0, 60.0, 60.0), button_type="app", name="Paint"),
         ]
 
         self.is_mouse_inside = False
@@ -145,7 +156,13 @@ class TestDockPanelLogic(unittest.TestCase):
                 self.hovered_button = btn
                 return btn.button_type
 
-        # Check app buttons
+        # Check link buttons (top row)
+        for btn in self.link_buttons:
+            if btn.contains(x, y):
+                self.hovered_button = btn
+                return btn.button_type
+
+        # Check app buttons (bottom row)
         for btn in self.app_buttons:
             if btn.contains(x, y):
                 self.hovered_button = btn
@@ -157,16 +174,14 @@ class TestDockPanelLogic(unittest.TestCase):
     def test_mouse_enter_dock(self):
         """Mouse entering dock should set is_mouse_inside to True."""
         self.assertFalse(self.is_mouse_inside)
-        result = self.simulate_mouse_move(300.0, 50.0)
+        result = self.simulate_mouse_move(400.0, 90.0)
         self.assertTrue(self.is_mouse_inside)
-        # Point (300, 50) is in the dock but not on any specific button
-        # since app buttons are at y=50 with height 40, so y=50 is at the top edge
-        # which may or may not be included depending on containment logic
-        self.assertIn(result, ["app", None])
+        # Point (400, 90) is in the dock but not on any specific button
+        self.assertIn(result, ["app", "link", None])
 
     def test_mouse_leave_dock(self):
         """Mouse leaving dock should set is_mouse_inside to False."""
-        self.simulate_mouse_move(300.0, 50.0)
+        self.simulate_mouse_move(400.0, 90.0)
         self.assertTrue(self.is_mouse_inside)
 
         result = self.simulate_mouse_move(-10.0, -10.0)
@@ -175,79 +190,79 @@ class TestDockPanelLogic(unittest.TestCase):
 
     def test_hover_detection_app_button(self):
         """Hovering over app button should detect correct button."""
-        result = self.simulate_mouse_move(35.0, 65.0)  # Center of first app button
+        result = self.simulate_mouse_move(90.0, 160.0)  # Center of first app button
         self.assertEqual(result, "app")
         self.assertIsNotNone(self.hovered_button)
         self.assertEqual(self.hovered_button.name, "Chrome")
 
+    def test_hover_detection_link_button(self):
+        """Hovering over link button should detect correctly."""
+        result = self.simulate_mouse_move(90.0, 60.0)  # Center of first link button
+        self.assertEqual(result, "link")
+        self.assertIsNotNone(self.hovered_button)
+        self.assertEqual(self.hovered_button.name, "GitHub")
+
     def test_hover_detection_minimize_button(self):
         """Hovering over minimize button should detect correctly."""
-        result = self.simulate_mouse_move(515.0, 25.0)
+        result = self.simulate_mouse_move(725.0, 40.0)
         self.assertEqual(result, "minimize")
         self.assertIsNotNone(self.hovered_button)
         self.assertEqual(self.hovered_button.button_type, "minimize")
 
     def test_hover_detection_close_button(self):
         """Hovering over close button should detect correctly."""
-        result = self.simulate_mouse_move(555.0, 25.0)
+        result = self.simulate_mouse_move(765.0, 40.0)
         self.assertEqual(result, "close")
         self.assertIsNotNone(self.hovered_button)
         self.assertEqual(self.hovered_button.button_type, "close")
 
     def test_no_hover_between_buttons(self):
         """Mouse between buttons should not hover anything."""
-        # Point between Chrome (y: 50-90) and VSCode (y: 50-90)
-        # Chrome: x=20-60, VSCode: x=70-110, so x=65 is between them
-        result = self.simulate_mouse_move(65.0, 70.0)
+        # Point between buttons (in empty cloud area)
+        result = self.simulate_mouse_move(250.0, 90.0)
         self.assertIsNone(result)
         self.assertIsNone(self.hovered_button)
 
     def test_hover_transition(self):
         """Moving from one button to another should update hover state."""
-        # Start on Chrome button
-        result1 = self.simulate_mouse_move(35.0, 65.0)
+        # Start on Chrome app button
+        result1 = self.simulate_mouse_move(90.0, 160.0)
         self.assertEqual(result1, "app")
         self.assertEqual(self.hovered_button.name, "Chrome")
 
-        # Move to VSCode button
-        result2 = self.simulate_mouse_move(85.0, 65.0)
-        self.assertEqual(result2, "app")
-        self.assertEqual(self.hovered_button.name, "VSCode")
+        # Move to GitHub link button
+        result2 = self.simulate_mouse_move(90.0, 60.0)
+        self.assertEqual(result2, "link")
+        self.assertEqual(self.hovered_button.name, "GitHub")
 
 
 class TestAlphaCalculation(unittest.TestCase):
-    """Tests for transparency/alpha calculation logic."""
+    """Tests for transparency/alpha calculation logic.
+    
+    Note: The new implementation uses solid rendering (alpha=255 always).
+    These tests are kept for legacy reference.
+    """
 
     def calculate_alpha(self, is_mouse_inside: bool,
                         has_hovered_button: bool) -> int:
         """Calculate global alpha (0-255) based on mouse state.
-
-        This simulates the C++ GetGlobalAlpha() logic:
+        
+        Legacy logic (no longer used):
         - Fully opaque (255) when mouse is inside
         - Semi-transparent (100) when mouse left but recently hovered
         - Nearly transparent (20) when mouse is far away
+        
+        Current implementation: Always returns 255 (solid rendering).
         """
-        if is_mouse_inside:
-            return 255
-        elif has_hovered_button:
-            return 100  # Fading out
-        else:
-            return 20   # Almost invisible
+        # New implementation: always solid (no transparency)
+        return 255
 
-    def test_alpha_when_mouse_inside(self):
-        """Alpha should be 255 when mouse is inside dock."""
-        alpha = self.calculate_alpha(is_mouse_inside=True, has_hovered_button=False)
-        self.assertEqual(alpha, 255)
-
-    def test_alpha_when_mouse_left_recently(self):
-        """Alpha should be 100 when mouse just left."""
-        alpha = self.calculate_alpha(is_mouse_inside=False, has_hovered_button=True)
-        self.assertEqual(alpha, 100)
-
-    def test_alpha_when_mouse_far_away(self):
-        """Alpha should be 20 when mouse is far away."""
-        alpha = self.calculate_alpha(is_mouse_inside=False, has_hovered_button=False)
-        self.assertEqual(alpha, 20)
+    def test_alpha_always_solid(self):
+        """Alpha should always be 255 (solid rendering)."""
+        alpha_inside = self.calculate_alpha(is_mouse_inside=True, has_hovered_button=False)
+        alpha_outside = self.calculate_alpha(is_mouse_inside=False, has_hovered_button=False)
+        self.assertEqual(alpha_inside, 255)
+        self.assertEqual(alpha_outside, 255)
 
 
 class TestButtonClickHandling(unittest.TestCase):

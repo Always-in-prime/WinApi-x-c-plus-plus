@@ -110,12 +110,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
   HWND hwnd = CreateWindowExW(
       WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW, L"CustomDockPanelClass",
-      L"Dock Panel", WS_POPUP, CW_USEDEFAULT, CW_USEDEFAULT, 600, 120, nullptr,
+      L"Dock Panel", WS_POPUP, CW_USEDEFAULT, CW_USEDEFAULT, 800, 180, nullptr,
       nullptr, hInstance, nullptr);
 
   if (!hwnd) {
     GdiplusShutdown(gdiplus_token);
     return 0;
+  }
+
+  // Apply cloud-shaped region to window
+  DockPanel* temp_panel = new DockPanel();
+  temp_panel->Initialize();
+  HRGN hCloudRgn = temp_panel->CreateCloudRegion();
+  delete temp_panel;
+  
+  if (hCloudRgn) {
+    SetWindowRgn(hwnd, hCloudRgn, TRUE);
   }
 
   ShowWindow(hwnd, nCmdShow);
