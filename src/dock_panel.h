@@ -39,11 +39,13 @@ class DockPanel {
   void DrawCloudShape(Graphics& graphics) const;
   void DrawControlButtons(Graphics& graphics) const;
   void DrawAppButtons(Graphics& graphics) const;
+  void DrawLinkButtons(Graphics& graphics) const;
 
-  // Alpha transparency based on mouse state
-  BYTE GetGlobalAlpha() const;
+  // Create cloud-shaped window region
+  HRGN CreateCloudRegion() const;
 
   std::vector<AppButton> app_buttons_;
+  std::vector<AppButton> link_buttons_;
   std::vector<ControlButton> ctrl_buttons_;
   bool is_mouse_inside_;
   NOTIFYICONDATAW nid_{};
