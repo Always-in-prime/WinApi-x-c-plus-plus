@@ -4,6 +4,8 @@
 #include <shellapi.h>
 #include <vector>
 #include <string>
+#include <memory>
+#include <optional>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "shell32.lib")
@@ -11,117 +13,107 @@
 using namespace Gdiplus;
 
 // ============================================================================
-// СТРУКТУРЫ ДАННЫХ
+// BUTTON CLASSES
 // ============================================================================
 
-struct AppButton {
-    RectF bounds;
-    std::wstring target;
-    std::wstring name;
-    bool isHovered;
-    std::wstring iconPath;
-    Image* iconImage;
-
-    AppButton(RectF b, std::wstring t, std::wstring n, std::wstring path)
-        : bounds(b), target(t), name(n), isHovered(false), iconPath(path), iconImage(nullptr) {}
+class Button {
+public:
+    virtual ~Button() = default;
+    virtual bool Contains(float x, float y) const = 0;
+    virtual void Draw(Graphics& graphics, BYTE globalAlpha) const = 0;
+    virtual bool IsHovered() const = 0;
+    virtual void SetHovered(bool hovered) = 0;
 };
 
-struct ControlButton {
-    RectF bounds;
-    std::wstring type; // "minimize" или "close"
-    bool isHovered;
+class ControlButton : public Button {
+public:
+    enum class Type { Minimize, Close };
 
-    ControlButton(RectF b, std::wstring t) : bounds(b), type(t), isHovered(false) {}
-};
+    ControlButton(RectF bounds, Type type)
+        : bounds_(bounds), type_(type), isHovered_(false) {}
 
-// ============================================================================
-// ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
-// ============================================================================
+    bool Contains(float x, float y) const override {
+        return bounds_.Contains(x, y);
+    }
 
-std::vector<AppButton> g_appButtons;
-std::vector<ControlButton> g_ctrlButtons;
-ULONG_PTR g_gdiplusToken;
-bool g_isMouseInside = false;
-NOTIFYICONDATAW g_nid = {};
+    void Draw(Graphics& graphics, BYTE globalAlpha) const override {
+        Color btnColor = isHovered_ ? Color(255, 255, 255, 255) : Color(globalAlpha, 180, 180, 180);
 
-// ============================================================================
-// ФУНКЦИИ ОТРИСОВКИ
-// ============================================================================
-
-void Render(HWND hwnd) {
-    RECT rcClient;
-    GetClientRect(hwnd, &rcClient);
-    int width = rcClient.right - rcClient.left;
-    int height = rcClient.bottom - rcClient.top;
-
-    HDC hdcScreen = GetDC(hwnd);
-    HDC hdcMem = CreateCompatibleDC(hdcScreen);
-
-    Bitmap bitmap(width, height, PixelFormat32bppARGB);
-    Graphics graphics(&bitmap);
-
-    // Обязательное сглаживание для идеально гладких краев
-    graphics.SetSmoothingMode(SmoothingModeAntiAlias);
-    graphics.SetPixelOffsetMode(PixelOffsetModeHalf);
-
-    // 1. Рисуем форму сглаженного облака (непрерывная кривая)
-    PointF pts[] = {
-        PointF(60.0f, 85.0f),   // низ лево
-        PointF(25.0f, 60.0f),   // левый край
-        PointF(60.0f, 35.0f),   // верх лево
-        PointF(150.0f, 15.0f),  // верхний бугор 1
-        PointF(300.0f, 10.0f),  // верхний центральный бугор
-        PointF(450.0f, 15.0f),  // верхний бугор 3
-        PointF(540.0f, 35.0f),  // верх право
-        PointF(575.0f, 60.0f),  // правый край
-        PointF(540.0f, 85.0f),  // низ право
-        PointF(450.0f, 105.0f), // нижний бугор 3
-        PointF(300.0f, 110.0f), // нижний центральный бугор
-        PointF(150.0f, 105.0f)  // нижний бугор 1
-    };
-
-    GraphicsPath cloudPath;
-    cloudPath.AddClosedCurve(pts, 12);
-
-    // Определяем общую непрозрачность окна (40% = 102, 100% = 255)
-    BYTE globalAlpha = g_isMouseInside ? 255 : 102;
-
-    // Фон облака (полупрозрачный темный)
-    SolidBrush bgBrush(Color(globalAlpha, 30, 30, 35));
-    graphics.FillPath(&bgBrush, &cloudPath);
-
-    // Тонкая граница облака
-    Pen borderPen(Color(globalAlpha, 255, 255, 255), 1.5f);
-    graphics.DrawPath(&borderPen, &cloudPath);
-
-    // 2. Рисуем кнопки управления (Свернуть и Закрыть)
-    for (const auto& btn : g_ctrlButtons) {
-        RectF r = btn.bounds;
-        Color btnColor = btn.isHovered ? Color(255, 255, 255, 255) : Color(globalAlpha, 180, 180, 180);
-
-        // Подсветка при наведении
-        if (btn.isHovered) {
+        if (isHovered_) {
             SolidBrush hoverBrush(Color(60, 255, 255, 255));
-            graphics.FillEllipse(&hoverBrush, r);
+            graphics.FillEllipse(&hoverBrush, bounds_);
         }
 
         Pen iconPen(btnColor, 2.0f);
-        if (btn.type == L"minimize") {
-            graphics.DrawLine(&iconPen, r.X + 8, r.Y + r.Height / 2, r.X + r.Width - 8, r.Y + r.Height / 2);
-        }
-        else if (btn.type == L"close") {
-            graphics.DrawLine(&iconPen, r.X + 8, r.Y + 8, r.X + r.Width - 8, r.Y + r.Height - 8);
-            graphics.DrawLine(&iconPen, r.X + r.Width - 8, r.Y + 8, r.X + 8, r.Y + r.Height - 8);
+        if (type_ == Type::Minimize) {
+            graphics.DrawLine(&iconPen, 
+                bounds_.X + 8, bounds_.Y + bounds_.Height / 2,
+                bounds_.X + bounds_.Width - 8, bounds_.Y + bounds_.Height / 2);
+        } else {
+            graphics.DrawLine(&iconPen, 
+                bounds_.X + 8, bounds_.Y + 8,
+                bounds_.X + bounds_.Width - 8, bounds_.Y + bounds_.Height - 8);
+            graphics.DrawLine(&iconPen, 
+                bounds_.X + bounds_.Width - 8, bounds_.Y + 8,
+                bounds_.X + 8, bounds_.Y + bounds_.Height - 8);
         }
     }
 
-    // 3. Рисуем кнопки-иконки приложений
-    for (auto& btn : g_appButtons) {
-        RectF r = btn.bounds;
+    Type GetType() const { return type_; }
+    bool IsHovered() const override { return isHovered_; }
+    void SetHovered(bool hovered) override { isHovered_ = hovered; }
 
-        // Эффект наведения: мягкий полупрозрачный круг-фон
-        if (btn.isHovered) {
-            RectF hoverRect = r;
+private:
+    RectF bounds_;
+    Type type_;
+    bool isHovered_;
+};
+
+class AppButton : public Button {
+public:
+    AppButton(RectF bounds, std::wstring target, std::wstring name, std::wstring iconPath)
+        : bounds_(bounds), target_(std::move(target)), name_(std::move(name)), 
+          iconPath_(std::move(iconPath)), isHovered_(false), iconImage_(nullptr) {}
+
+    ~AppButton() override {
+        if (iconImage_) {
+            delete iconImage_;
+        }
+    }
+
+    // Non-copyable due to raw pointer
+    AppButton(const AppButton&) = delete;
+    AppButton& operator=(const AppButton&) = delete;
+
+    // Movable
+    AppButton(AppButton&& other) noexcept
+        : bounds_(other.bounds_), target_(std::move(other.target_)), 
+          name_(std::move(other.name_)), iconPath_(std::move(other.iconPath_)),
+          isHovered_(other.isHovered_), iconImage_(other.iconImage_) {
+        other.iconImage_ = nullptr;
+    }
+
+    AppButton& operator=(AppButton&& other) noexcept {
+        if (this != &other) {
+            if (iconImage_) delete iconImage_;
+            bounds_ = other.bounds_;
+            target_ = std::move(other.target_);
+            name_ = std::move(other.name_);
+            iconPath_ = std::move(other.iconPath_);
+            isHovered_ = other.isHovered_;
+            iconImage_ = other.iconImage_;
+            other.iconImage_ = nullptr;
+        }
+        return *this;
+    }
+
+    bool Contains(float x, float y) const override {
+        return bounds_.Contains(x, y);
+    }
+
+    void Draw(Graphics& graphics, BYTE globalAlpha) const override {
+        if (isHovered_) {
+            RectF hoverRect = bounds_;
             hoverRect.Inflate(12.0f, 12.0f);
             GraphicsPath hoverPath;
             hoverPath.AddEllipse(hoverRect);
@@ -129,18 +121,15 @@ void Render(HWND hwnd) {
             graphics.FillPath(&hoverBrush, &hoverPath);
         }
 
-        // Отрисовка иконки или программной заглушки
-        RectF iconRect = r;
+        RectF iconRect = bounds_;
         iconRect.Inflate(-8.0f, -8.0f);
-        if (btn.isHovered) {
-            iconRect.Inflate(3.0f, 3.0f); // Легкое увеличение при наведении
+        if (isHovered_) {
+            iconRect.Inflate(3.0f, 3.0f);
         }
 
-        if (btn.iconImage && btn.iconImage->GetLastStatus() == Ok) {
-            graphics.DrawImage(btn.iconImage, iconRect);
-        }
-        else {
-            // Программная заглушка (гарантирует работу приложения без внешних PNG файлов)
+        if (iconImage_ && iconImage_->GetLastStatus() == Ok) {
+            graphics.DrawImage(iconImage_, iconRect);
+        } else {
             GraphicsPath iconPath;
             iconPath.AddEllipse(iconRect);
             SolidBrush iconBrush(Color(globalAlpha, 100, 150, 255));
@@ -153,206 +142,336 @@ void Render(HWND hwnd) {
             stringFormat.SetAlignment(StringAlignmentCenter);
             stringFormat.SetLineAlignment(StringAlignmentCenter);
 
-            std::wstring letter = btn.name.substr(0, 1);
-            graphics.DrawString(letter.c_str(), -1, &font, r, &stringFormat, &textBrush);
+            std::wstring letter = name_.substr(0, 1);
+            graphics.DrawString(letter.c_str(), -1, &font, iconRect, &stringFormat, &textBrush);
         }
     }
 
-    // 4. Применяем результат через UpdateLayeredWindow (многослойное окно)
-    HBITMAP hBitmap;
-    bitmap.GetHBITMAP(Color(0, 0, 0, 0), &hBitmap);
-    HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdcMem, hBitmap);
+    void LoadIcon() {
+        iconImage_ = Image::FromFile(iconPath_.c_str());
+    }
 
-    RECT rcWindow;
-    GetWindowRect(hwnd, &rcWindow);
-    POINT ptDst = { rcWindow.left, rcWindow.top };
-    SIZE sizeWnd = { width, height };
-    POINT ptSrc = { 0, 0 };
+    const std::wstring& GetTarget() const { return target_; }
+    bool IsHovered() const override { return isHovered_; }
+    void SetHovered(bool hovered) override { isHovered_ = hovered; }
 
-    BLENDFUNCTION blend = { AC_SRC_OVER, 0, globalAlpha, AC_SRC_ALPHA };
-    UpdateLayeredWindow(hwnd, hdcScreen, &ptDst, &sizeWnd, hdcMem, &ptSrc, 0, &blend, ULW_ALPHA);
-
-    // Очистка ресурсов отрисовки
-    SelectObject(hdcMem, hOldBitmap);
-    DeleteObject(hBitmap);
-    DeleteDC(hdcMem);
-    ReleaseDC(hwnd, hdcScreen);
-}
+private:
+    RectF bounds_;
+    std::wstring target_;
+    std::wstring name_;
+    std::wstring iconPath_;
+    mutable bool isHovered_;
+    Image* iconImage_;
+};
 
 // ============================================================================
-// ОБРАБОТКА СООБЩЕНИЙ ОКНА
+// DOCK PANEL CLASS
 // ============================================================================
 
-LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
-    case WM_CREATE: {
-        // Инициализация кнопок управления (правый верхний угол)
-        g_ctrlButtons.emplace_back(RectF(510.0f, 25.0f, 30.0f, 30.0f), L"minimize");
-        g_ctrlButtons.emplace_back(RectF(550.0f, 25.0f, 30.0f, 30.0f), L"close");
+class DockPanel {
+public:
+    DockPanel() : isMouseInside_(false) {}
 
-        // Инициализация кнопок запуска приложений
-        g_appButtons.emplace_back(RectF(60.0f, 30.0f, 60.0f, 60.0f), L"chrome.exe", L"Chrome", L"chrome.png");
-        g_appButtons.emplace_back(RectF(140.0f, 30.0f, 60.0f, 60.0f), L"explorer.exe", L"Explorer", L"explorer.png");
-        g_appButtons.emplace_back(RectF(220.0f, 30.0f, 60.0f, 60.0f), L"notepad.exe", L"Notepad", L"notepad.png");
-        g_appButtons.emplace_back(RectF(300.0f, 30.0f, 60.0f, 60.0f), L"https://github.com", L"GitHub", L"github.png");
-        g_appButtons.emplace_back(RectF(380.0f, 30.0f, 60.0f, 60.0f), L"https://youtube.com", L"YouTube", L"youtube.png");
+    void Initialize() {
+        // Initialize control buttons (top-right corner)
+        ctrlButtons_.emplace_back(RectF(510.0f, 25.0f, 30.0f, 30.0f), ControlButton::Type::Minimize);
+        ctrlButtons_.emplace_back(RectF(550.0f, 25.0f, 30.0f, 30.0f), ControlButton::Type::Close);
 
-        // Загрузка изображений (если файла нет, GetLastStatus() вернет ошибку, и сработает заглушка)
-        for (auto& btn : g_appButtons) {
-            btn.iconImage = Image::FromFile(btn.iconPath.c_str());
+        // Initialize app buttons
+        appButtons_.emplace_back(RectF(60.0f, 30.0f, 60.0f, 60.0f), 
+            L"chrome.exe", L"Chrome", L"chrome.png");
+        appButtons_.emplace_back(RectF(140.0f, 30.0f, 60.0f, 60.0f), 
+            L"explorer.exe", L"Explorer", L"explorer.png");
+        appButtons_.emplace_back(RectF(220.0f, 30.0f, 60.0f, 60.0f), 
+            L"notepad.exe", L"Notepad", L"notepad.png");
+        appButtons_.emplace_back(RectF(300.0f, 30.0f, 60.0f, 60.0f), 
+            L"https://github.com", L"GitHub", L"github.png");
+        appButtons_.emplace_back(RectF(380.0f, 30.0f, 60.0f, 60.0f), 
+            L"https://youtube.com", L"YouTube", L"youtube.png");
+
+        // Load icons
+        for (auto& btn : appButtons_) {
+            btn.LoadIcon();
         }
 
-        // Настройка иконки в системном трее
-        g_nid.cbSize = sizeof(NOTIFYICONDATAW);
-        g_nid.hWnd = hwnd;
-        g_nid.uID = 1;
-        g_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-        g_nid.uCallbackMessage = WM_USER + 1;
-        g_nid.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
-        wcscpy_s(g_nid.szTip, L"Custom Dock Panel");
-        Shell_NotifyIconW(NIM_ADD, &g_nid);
-        break;
+        // Setup system tray icon
+        nid_.cbSize = sizeof(NOTIFYICONDATAW);
+        nid_.hWnd = nullptr; // Will be set later
+        nid_.uID = 1;
+        nid_.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+        nid_.uCallbackMessage = WM_USER + 1;
+        nid_.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
+        wcscpy_s(nid_.szTip, L"Custom Dock Panel");
     }
 
-    case WM_PAINT: {
-        Render(hwnd);
-        ValidateRect(hwnd, nullptr);
-        break;
+    void SetHwnd(HWND hwnd) {
+        nid_.hWnd = hwnd;
     }
 
-    case WM_MOUSEMOVE: {
-        int x = GET_X_LPARAM(lParam);
-        int y = GET_Y_LPARAM(lParam);
+    void Render(HWND hwnd) const {
+        RECT rcClient;
+        GetClientRect(hwnd, &rcClient);
+        int width = rcClient.right - rcClient.left;
+        int height = rcClient.bottom - rcClient.top;
+
+        HDC hdcScreen = GetDC(hwnd);
+        HDC hdcMem = CreateCompatibleDC(hdcScreen);
+
+        Bitmap bitmap(width, height, PixelFormat32bppARGB);
+        Graphics graphics(&bitmap);
+
+        graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+        graphics.SetPixelOffsetMode(PixelOffsetModeHalf);
+
+        DrawCloudShape(graphics);
+        DrawControlButtons(graphics);
+        DrawAppButtons(graphics);
+
+        HBITMAP hBitmap;
+        bitmap.GetHBITMAP(Color(0, 0, 0, 0), &hBitmap);
+        HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdcMem, hBitmap);
+
+        RECT rcWindow;
+        GetWindowRect(hwnd, &rcWindow);
+        POINT ptDst = { rcWindow.left, rcWindow.top };
+        SIZE sizeWnd = { width, height };
+        POINT ptSrc = { 0, 0 };
+
+        BLENDFUNCTION blend = { AC_SRC_OVER, 0, GetGlobalAlpha(), AC_SRC_ALPHA };
+        UpdateLayeredWindow(hwnd, hdcScreen, &ptDst, &sizeWnd, hdcMem, &ptSrc, 0, &blend, ULW_ALPHA);
+
+        SelectObject(hdcMem, hOldBitmap);
+        DeleteObject(hBitmap);
+        DeleteDC(hdcMem);
+        ReleaseDC(hwnd, hdcScreen);
+    }
+
+    bool HandleMouseMove(HWND hwnd, int x, int y) {
         bool needsRedraw = false;
 
-        // Отслеживание входа мыши в окно для изменения прозрачности
-        if (!g_isMouseInside) {
-            g_isMouseInside = true;
+        if (!isMouseInside_) {
+            isMouseInside_ = true;
             needsRedraw = true;
         }
 
-        // Проверка наведения на кнопки управления
-        for (auto& btn : g_ctrlButtons) {
-            bool wasHovered = btn.isHovered;
-            btn.isHovered = btn.bounds.Contains((float)x, (float)y);
-            if (wasHovered != btn.isHovered) needsRedraw = true;
+        for (auto& btn : ctrlButtons_) {
+            bool wasHovered = btn.IsHovered();
+            btn.SetHovered(btn.Contains(static_cast<float>(x), static_cast<float>(y)));
+            if (wasHovered != btn.IsHovered()) needsRedraw = true;
         }
 
-        // Проверка наведения на кнопки приложений
-        for (auto& btn : g_appButtons) {
-            bool wasHovered = btn.isHovered;
-            btn.isHovered = btn.bounds.Contains((float)x, (float)y);
-            if (wasHovered != btn.isHovered) needsRedraw = true;
+        for (auto& btn : appButtons_) {
+            bool wasHovered = btn.IsHovered();
+            btn.SetHovered(btn.Contains(static_cast<float>(x), static_cast<float>(y)));
+            if (wasHovered != btn.IsHovered()) needsRedraw = true;
         }
 
         if (needsRedraw) {
             InvalidateRect(hwnd, nullptr, FALSE);
         }
 
-        // Запрос сообщения WM_MOUSELEAVE при уходе курсора
         TRACKMOUSEEVENT tme = { sizeof(TRACKMOUSEEVENT), TME_LEAVE, hwnd, 0 };
         TrackMouseEvent(&tme);
-        break;
+        return needsRedraw;
     }
 
-    case WM_MOUSELEAVE: {
-        g_isMouseInside = false;
+    bool HandleMouseLeave(HWND hwnd) {
+        isMouseInside_ = false;
         bool needsRedraw = false;
 
-        for (auto& btn : g_ctrlButtons) {
-            if (btn.isHovered) { btn.isHovered = false; needsRedraw = true; }
+        for (auto& btn : ctrlButtons_) {
+            if (btn.IsHovered()) { btn.SetHovered(false); needsRedraw = true; }
         }
-        for (auto& btn : g_appButtons) {
-            if (btn.isHovered) { btn.isHovered = false; needsRedraw = true; }
+        for (auto& btn : appButtons_) {
+            if (btn.IsHovered()) { btn.SetHovered(false); needsRedraw = true; }
         }
 
         if (needsRedraw) {
             InvalidateRect(hwnd, nullptr, FALSE);
         }
-        break;
+        return needsRedraw;
     }
 
-    case WM_LBUTTONDOWN: {
-        int x = GET_X_LPARAM(lParam);
-        int y = GET_Y_LPARAM(lParam);
+    bool HandleLeftButtonDown(HWND hwnd, int x, int y) {
         bool handled = false;
 
-        // 1. Проверка кнопок управления
-        for (const auto& btn : g_ctrlButtons) {
-            if (btn.bounds.Contains((float)x, (float)y)) {
-                if (btn.type == L"minimize") {
-                    ShowWindow(hwnd, SW_HIDE); // Скрываем, но оставляем в трее
-                }
-                else if (btn.type == L"close") {
-                    DestroyWindow(hwnd); // Полное закрытие
+        for (const auto& btn : ctrlButtons_) {
+            if (btn.Contains(static_cast<float>(x), static_cast<float>(y))) {
+                if (btn.GetType() == ControlButton::Type::Minimize) {
+                    ShowWindow(hwnd, SW_HIDE);
+                } else {
+                    DestroyWindow(hwnd);
                 }
                 handled = true;
                 break;
             }
         }
 
-        // 2. Проверка кнопок приложений
         if (!handled) {
-            for (const auto& btn : g_appButtons) {
-                if (btn.bounds.Contains((float)x, (float)y)) {
-                    ShellExecuteW(nullptr, L"open", btn.target.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+            for (const auto& btn : appButtons_) {
+                if (btn.Contains(static_cast<float>(x), static_cast<float>(y))) {
+                    ShellExecuteW(nullptr, L"open", btn.GetTarget().c_str(), 
+                        nullptr, nullptr, SW_SHOWNORMAL);
                     handled = true;
                     break;
                 }
             }
         }
 
-        // 3. Если клик по пустому месту облака — перетаскивание окна
         if (!handled) {
             PostMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
         }
-        break;
+        return handled;
     }
 
-    case WM_USER + 1: { // Обработка сообщений от иконки в трее
+    void HandleTrayMessage(HWND hwnd, LPARAM lParam) {
         if (lParam == WM_RBUTTONUP) {
             POINT pt;
             GetCursorPos(&pt);
 
-            // Создаем контекстное меню
             HMENU hMenu = CreatePopupMenu();
             AppendMenuW(hMenu, MF_STRING, 1, L"Развернуть панель");
             AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
             AppendMenuW(hMenu, MF_STRING, 2, L"Выход");
 
-            // Обязательный трюк для корректного закрытия меню при клике вне его
             SetForegroundWindow(hwnd);
             TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
             PostMessage(hwnd, WM_NULL, 0, 0);
 
             DestroyMenu(hMenu);
         }
+    }
+
+    void HandleCommand(WPARAM wParam, HWND hwnd) {
+        if (LOWORD(wParam) == 1) {
+            ShowWindow(hwnd, SW_SHOW);
+        } else if (LOWORD(wParam) == 2) {
+            DestroyWindow(hwnd);
+        }
+    }
+
+    void Cleanup() {
+        Shell_NotifyIconW(NIM_DELETE, &nid_);
+        appButtons_.clear();
+        ctrlButtons_.clear();
+    }
+
+    NOTIFYICONDATAW* GetNotifyIconData() { return &nid_; }
+
+private:
+    void DrawCloudShape(Graphics& graphics) const {
+        PointF pts[] = {
+            PointF(60.0f, 85.0f), PointF(25.0f, 60.0f), PointF(60.0f, 35.0f),
+            PointF(150.0f, 15.0f), PointF(300.0f, 10.0f), PointF(450.0f, 15.0f),
+            PointF(540.0f, 35.0f), PointF(575.0f, 60.0f), PointF(540.0f, 85.0f),
+            PointF(450.0f, 105.0f), PointF(300.0f, 110.0f), PointF(150.0f, 105.0f)
+        };
+
+        GraphicsPath cloudPath;
+        cloudPath.AddClosedCurve(pts, 12);
+
+        BYTE globalAlpha = GetGlobalAlpha();
+        SolidBrush bgBrush(Color(globalAlpha, 30, 30, 35));
+        graphics.FillPath(&bgBrush, &cloudPath);
+
+        Pen borderPen(Color(globalAlpha, 255, 255, 255), 1.5f);
+        graphics.DrawPath(&borderPen, &cloudPath);
+    }
+
+    void DrawControlButtons(Graphics& graphics) const {
+        BYTE globalAlpha = GetGlobalAlpha();
+        for (const auto& btn : ctrlButtons_) {
+            btn.Draw(graphics, globalAlpha);
+        }
+    }
+
+    void DrawAppButtons(Graphics& graphics) const {
+        BYTE globalAlpha = GetGlobalAlpha();
+        for (const auto& btn : appButtons_) {
+            btn.Draw(graphics, globalAlpha);
+        }
+    }
+
+    BYTE GetGlobalAlpha() const {
+        return isMouseInside_ ? 255 : 102;
+    }
+
+private:
+    std::vector<AppButton> appButtons_;
+    std::vector<ControlButton> ctrlButtons_;
+    bool isMouseInside_;
+    NOTIFYICONDATAW nid_{};
+};
+
+// ============================================================================
+// WINDOW PROCEDURE
+// ============================================================================
+
+static DockPanel* g_dockPanel = nullptr;
+
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_CREATE: {
+        g_dockPanel = new DockPanel();
+        g_dockPanel->Initialize();
+        g_dockPanel->SetHwnd(hwnd);
+        Shell_NotifyIconW(NIM_ADD, g_dockPanel->GetNotifyIconData());
+        break;
+    }
+
+    case WM_PAINT: {
+        if (g_dockPanel) {
+            g_dockPanel->Render(hwnd);
+        }
+        ValidateRect(hwnd, nullptr);
+        break;
+    }
+
+    case WM_MOUSEMOVE: {
+        if (g_dockPanel) {
+            int x = GET_X_LPARAM(lParam);
+            int y = GET_Y_LPARAM(lParam);
+            g_dockPanel->HandleMouseMove(hwnd, x, y);
+        }
+        break;
+    }
+
+    case WM_MOUSELEAVE: {
+        if (g_dockPanel) {
+            g_dockPanel->HandleMouseLeave(hwnd);
+        }
+        break;
+    }
+
+    case WM_LBUTTONDOWN: {
+        if (g_dockPanel) {
+            int x = GET_X_LPARAM(lParam);
+            int y = GET_Y_LPARAM(lParam);
+            g_dockPanel->HandleLeftButtonDown(hwnd, x, y);
+        }
+        break;
+    }
+
+    case WM_USER + 1: {
+        if (g_dockPanel) {
+            g_dockPanel->HandleTrayMessage(hwnd, lParam);
+        }
         break;
     }
 
     case WM_COMMAND: {
-        if (LOWORD(wParam) == 1) { // Развернуть панель
-            ShowWindow(hwnd, SW_SHOW);
-        }
-        else if (LOWORD(wParam) == 2) { // Выход
-            DestroyWindow(hwnd);
+        if (g_dockPanel) {
+            g_dockPanel->HandleCommand(wParam, hwnd);
         }
         break;
     }
 
     case WM_DESTROY: {
-        // Корректное удаление иконки из трея
-        Shell_NotifyIconW(NIM_DELETE, &g_nid);
-
-        // Освобождение ресурсов GDI+
-        for (auto& btn : g_appButtons) {
-            if (btn.iconImage) {
-                delete btn.iconImage;
-            }
+        if (g_dockPanel) {
+            g_dockPanel->Cleanup();
+            delete g_dockPanel;
+            g_dockPanel = nullptr;
         }
-        g_appButtons.clear();
-        g_ctrlButtons.clear();
-
         PostQuitMessage(0);
         break;
     }
@@ -364,15 +483,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 // ============================================================================
-// ТОЧКА ВХОДА
+// ENTRY POINT
 // ============================================================================
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    // 1. Инициализация GDI+
     GdiplusStartupInput gdiplusStartupInput;
-    GdiplusStartup(&g_gdiplusToken, &gdiplusStartupInput, nullptr);
+    ULONG_PTR gdiplusToken;
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
 
-    // 2. Регистрация класса окна
     WNDCLASSEXW wc = { sizeof(WNDCLASSEXW) };
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc = WndProc;
@@ -382,8 +500,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     RegisterClassExW(&wc);
 
-    // 3. Создание многослойного окна без рамки и без отображения на панели задач
-    // WS_EX_TOOLWINDOW скрывает окно с панели задач Windows
     HWND hwnd = CreateWindowExW(
         WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
         L"CustomDockPanelClass",
@@ -394,21 +510,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     );
 
     if (!hwnd) {
-        GdiplusShutdown(g_gdiplusToken);
+        GdiplusShutdown(gdiplusToken);
         return 0;
     }
 
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
 
-    // 4. Цикл сообщений
     MSG msg;
     while (GetMessage(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // 5. Завершение работы GDI+
-    GdiplusShutdown(g_gdiplusToken);
-    return (int)msg.wParam;
+    GdiplusShutdown(gdiplusToken);
+    return static_cast<int>(msg.wParam);
 }
