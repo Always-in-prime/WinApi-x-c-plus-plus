@@ -34,15 +34,15 @@ class DockPanel {
   // Get notify icon data for shell integration
   NOTIFYICONDATAW* GetNotifyIconData() { return &nid_; }
 
+  // Create cloud-shaped window region (public for main.cpp)
+  HRGN CreateCloudRegion() const;
+
  private:
   // Drawing helpers
   void DrawCloudShape(Graphics& graphics) const;
   void DrawControlButtons(Graphics& graphics) const;
   void DrawAppButtons(Graphics& graphics) const;
   void DrawLinkButtons(Graphics& graphics) const;
-
-  // Create cloud-shaped window region
-  HRGN CreateCloudRegion() const;
 
   std::vector<AppButton> app_buttons_;
   std::vector<AppButton> link_buttons_;
