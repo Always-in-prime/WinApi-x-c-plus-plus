@@ -12,13 +12,17 @@
 venv/
 .venv/
 __pycache__/
-.mypy_cache/
-.pytest_cache/
-dist/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+ENV/
+
+# Build directories
 build/
-node_modules/
-target/
-.gradle/
+dist/
+*.egg-info/
 
 # Logs and temp files
 *.log
@@ -26,45 +30,119 @@ target/
 *.swp
 *.swo
 
-# Environment
+# Environment files
 .env
 .env.local
 *.env.*
 
-# Editors
+# Editors and IDEs
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# System files
-.DS_Store
-Thumbs.db
-
-# Coverage
+# Coverage reports
 coverage/
 htmlcov/
 .coverage
 
-# Compressed files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# C++ specific
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
+*.ilk
+*.pdb
+*.gch
+*.gcda
+*.gcno
+*.stackdump
+*.core
+*.stackdump.*
+*.bin
+*.out.dSYM/
+*.dylib
+*.so.*
+*.dll.*
+*.exe.*
+*.obj.*
+*.o.*
+*.a.*
+*.lib
+*.exp
+*.ilk
+*.pdb
+*.ipdb
+*.iobj
+*.ipch
+*.aps
+*.ncb
+*.opt
+*.plg
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp.*
+*.log
+*.bak
+*.old
+*.orig
+*.rej
+*.~
+*~
+.#*
+*.#
+*#
+*.swp
+*.swo
+.LOCK.*
+*~
+\#*\#
+.\#*
+*.swp
+*.swo
+*.swn
+*.snu
+*.snm
+*.snl
+*.snx
+*.snt
+*.snv
+*.snw
+*.snz
+*.sn1
+*.sn2
+*.sn3
+*.sn4
+*.sn5
+*.sn6
+*.sn7
+*.sn8
+*.sn9
 ```
