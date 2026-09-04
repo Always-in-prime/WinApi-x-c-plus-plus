@@ -316,22 +316,23 @@ void DockPanel::DrawAppButtons(Graphics& graphics) const {
 }
 
 HRGN DockPanel::CreateCloudRegion() const {
-    PointF pts[] = {
-        PointF(50.0f, 140.0f), PointF(20.0f, 100.0f), PointF(50.0f, 60.0f),
-        PointF(120.0f, 20.0f), PointF(250.0f, 10.0f), PointF(400.0f, 5.0f),
-        PointF(550.0f, 10.0f), PointF(680.0f, 20.0f), PointF(750.0f, 60.0f),
-        PointF(780.0f, 100.0f), PointF(750.0f, 140.0f), PointF(680.0f, 160.0f),
-        PointF(550.0f, 170.0f), PointF(400.0f, 175.0f), PointF(250.0f, 170.0f),
-        PointF(120.0f, 160.0f) };
+  // Create cloud-shaped region for window clipping
+  PointF pts[] = {
+      PointF(50.0f, 140.0f), PointF(20.0f, 100.0f), PointF(50.0f, 60.0f),
+      PointF(120.0f, 20.0f), PointF(250.0f, 10.0f), PointF(400.0f, 5.0f),
+      PointF(550.0f, 10.0f), PointF(680.0f, 20.0f), PointF(750.0f, 60.0f),
+      PointF(780.0f, 100.0f), PointF(750.0f, 140.0f), PointF(680.0f, 160.0f),
+      PointF(550.0f, 170.0f), PointF(400.0f, 175.0f), PointF(250.0f, 170.0f),
+      PointF(120.0f, 160.0f)};
 
-    GraphicsPath cloud_path;
-    // Исправлено: _countof(pts) вместо магического числа 12
-    cloud_path.AddClosedCurve(pts, _countof(pts));
+  GraphicsPath cloud_path;
+  cloud_path.AddClosedCurve(pts, 12);
 
-    HRGN hRgn = nullptr;
-    Status status = cloud_path.GetHRGN(&hRgn);
-    if (status != Ok) {
-        return nullptr;
-    }
-    return hRgn;
+  Region region(&cloud_path);
+  HRGN hRgn = nullptr;
+  Status status = region.GetHRGN(&hRgn);
+  if (status != Ok) {
+    return nullptr;
+  }
+  return hRgn;
 }
