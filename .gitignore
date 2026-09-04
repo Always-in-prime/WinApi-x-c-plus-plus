@@ -1,1 +1,8 @@
-Nothing should be ignored based on the provided file changes. The only modified file is `src/dock_panel.cpp`, which is a source code file and should not be added to .gitignore.
+```
+# Compiled Python files
+*.pyc
+__pycache__/
+
+# Test cache
+.pytest_cache/
+```

@@ -259,7 +259,7 @@ void DockPanel::DrawCloudShape(Graphics& graphics) const {
       PointF(120.0f, 160.0f)};
 
   GraphicsPath cloud_path;
-  cloud_path.AddClosedCurve(pts, 12);
+  cloud_path.AddClosedCurve(pts, _countof(pts));
 
   // Solid background color (no transparency)
   SolidBrush bg_brush(Color(255, 45, 45, 50));
@@ -298,11 +298,17 @@ HRGN DockPanel::CreateCloudRegion() const {
       PointF(120.0f, 160.0f)};
 
   GraphicsPath cloud_path;
-  cloud_path.AddClosedCurve(pts, 12);
+  cloud_path.AddClosedCurve(pts, _countof(pts));
 
   Region region(&cloud_path);
   HRGN hRgn = nullptr;
-  Status status = region.GetHRGN(&hRgn);
+  
+  // GetDC for creating Graphics context needed by GetHRGN
+  HDC hdc = GetDC(nullptr);
+  Graphics graphics(hdc);
+  Status status = region.GetHRGN(&graphics, &hRgn);
+  ReleaseDC(nullptr, hdc);
+  
   if (status != Ok) {
     return nullptr;
   }
