@@ -194,16 +194,19 @@ class TestDockPanelLogic(unittest.TestCase):
         self.assertEqual(self.hovered_button.name, "GitHub")
 class TestAlphaCalculation(unittest.TestCase):
     """Tests for transparency/alpha calculation logic.
+
     Note: The new implementation uses solid rendering (alpha=255 always).
     These tests are kept for legacy reference.
     """
     def calculate_alpha(self, is_mouse_inside: bool,
                         has_hovered_button: bool) -> int:
         """Calculate global alpha (0-255) based on mouse state.
+
         Legacy logic (no longer used):
         - Fully opaque (255) when mouse is inside
         - Semi-transparent (100) when mouse left but recently hovered
         - Nearly transparent (20) when mouse is far away
+
         Current implementation: Always returns 255 (solid rendering).
         """
         # New implementation: always solid (no transparency)

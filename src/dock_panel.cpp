@@ -286,9 +286,8 @@ void DockPanel::DrawCloudShape(Graphics& graphics) const {
         PointF(550.0f, 170.0f), PointF(400.0f, 175.0f), PointF(250.0f, 170.0f),
         PointF(120.0f, 160.0f) };
 
-    GraphicsPath cloud_path;
-    // Исправлено: раньше было жестко задано 12, хотя точек 16
-    cloud_path.AddClosedCurve(pts, _countof(pts));
+  GraphicsPath cloud_path;
+  cloud_path.AddClosedCurve(pts, _countof(pts));
 
     SolidBrush bg_brush(Color(255, 45, 45, 50));
     graphics.FillPath(&bg_brush, &cloud_path);
@@ -326,11 +325,17 @@ HRGN DockPanel::CreateCloudRegion() const {
       PointF(120.0f, 160.0f)};
 
   GraphicsPath cloud_path;
-  cloud_path.AddClosedCurve(pts, 12);
+  cloud_path.AddClosedCurve(pts, _countof(pts));
 
   Region region(&cloud_path);
   HRGN hRgn = nullptr;
-  Status status = region.GetHRGN(&hRgn);
+  
+  // GetDC for creating Graphics context needed by GetHRGN
+  HDC hdc = GetDC(nullptr);
+  Graphics graphics(hdc);
+  Status status = region.GetHRGN(&graphics, &hRgn);
+  ReleaseDC(nullptr, hdc);
+  
   if (status != Ok) {
     return nullptr;
   }
